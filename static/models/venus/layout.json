@@ -1,0 +1,373 @@
+{
+ "version": 1,
+ "name": "Venus",
+ "hull": {
+  "shape": "box",
+  "length": 501.65,
+  "width": 298.45,
+  "height": 149.23,
+  "radius": 0,
+  "diameter": 203,
+  "wall": 3.175,
+  "cap": 3.175,
+  "hullMass": 0,
+  "water": "fresh"
+ },
+ "settings": {
+  "clearance": 1.0,
+  "snap": 5
+ },
+ "parts": [
+  {
+   "id": "cad-dfc-1",
+   "name": "DFC",
+   "shape": "box",
+   "kind": "part",
+   "size": {
+    "x": 36.83,
+    "y": 93.73,
+    "z": 32.0
+   },
+   "mass": 0,
+   "color": "#2ac3de",
+   "pos": {
+    "x": 164.86,
+    "y": 58.25,
+    "z": -42.74
+   },
+   "rot": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+   },
+   "locked": false,
+   "hidden": false,
+   "mesh": "models/venus/dfc.hpm",
+   "source": "DFC-1"
+  },
+  {
+   "id": "cad-electrical-board-1",
+   "name": "Electrical Board 1",
+   "shape": "box",
+   "kind": "part",
+   "size": {
+    "x": 114.3,
+    "y": 165.1,
+    "z": 1.42
+   },
+   "mass": 0,
+   "color": "#2f7d4f",
+   "pos": {
+    "x": -152.06,
+    "y": 69.71,
+    "z": -58.03
+   },
+   "rot": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": -90.0
+   },
+   "locked": false,
+   "hidden": false,
+   "mesh": "models/venus/electrical-board.hpm",
+   "source": "Electrical Board-1"
+  },
+  {
+   "id": "cad-ffc-full-zed-1",
+   "name": "FFC (ZED)",
+   "shape": "box",
+   "kind": "part",
+   "size": {
+    "x": 36.83,
+    "y": 163.58,
+    "z": 32.0
+   },
+   "mass": 0,
+   "color": "#73daca",
+   "pos": {
+    "x": 231.36,
+    "y": 1.08,
+    "z": 24.23
+   },
+   "rot": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+   },
+   "locked": false,
+   "hidden": false,
+   "mesh": "models/venus/ffc-full-zed.hpm",
+   "source": "FFC Full zed-1"
+  },
+  {
+   "id": "cad-orin-with-capture-card-1",
+   "name": "Orin + capture card",
+   "shape": "box",
+   "kind": "part",
+   "size": {
+    "x": 105.99,
+    "y": 105.99,
+    "z": 73.79
+   },
+   "mass": 0,
+   "color": "#5d7a3a",
+   "pos": {
+    "x": -164.53,
+    "y": -61.84,
+    "z": -21.84
+   },
+   "rot": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+   },
+   "locked": false,
+   "hidden": true,
+   "mesh": "models/venus/orin-with-capture-card.hpm",
+   "source": "Orin with capture card-1"
+  },
+  {
+   "id": "cad-vectornav-vn100-1",
+   "name": "VectorNav VN-100",
+   "shape": "box",
+   "kind": "part",
+   "size": {
+    "x": 33.02,
+    "y": 35.81,
+    "z": 8.89
+   },
+   "mass": 0,
+   "color": "#bb9af7",
+   "pos": {
+    "x": -158.61,
+    "y": -63.46,
+    "z": -54.29
+   },
+   "rot": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+   },
+   "locked": false,
+   "hidden": false,
+   "mesh": "models/venus/vectornav-vn100.hpm",
+   "source": "Vectornav VN100-1"
+  },
+  {
+   "id": "cad-electrical-board-2",
+   "name": "Electrical Board 2",
+   "shape": "box",
+   "kind": "part",
+   "size": {
+    "x": 114.3,
+    "y": 165.1,
+    "z": 1.42
+   },
+   "mass": 0,
+   "color": "#2f7d4f",
+   "pos": {
+    "x": -152.06,
+    "y": 69.71,
+    "z": -40.73
+   },
+   "rot": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": -90.0
+   },
+   "locked": false,
+   "hidden": false,
+   "mesh": "models/venus/electrical-board.hpm",
+   "source": "Electrical Board-2"
+  },
+  {
+   "id": "cad-electrical-board-3",
+   "name": "Electrical Board 3",
+   "shape": "box",
+   "kind": "part",
+   "size": {
+    "x": 114.3,
+    "y": 165.1,
+    "z": 1.42
+   },
+   "mass": 0,
+   "color": "#2f7d4f",
+   "pos": {
+    "x": -152.06,
+    "y": 69.71,
+    "z": -23.44
+   },
+   "rot": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": -90.0
+   },
+   "locked": false,
+   "hidden": false,
+   "mesh": "models/venus/electrical-board.hpm",
+   "source": "Electrical Board-3"
+  },
+  {
+   "id": "cad-electrical-board-4",
+   "name": "Electrical Board 4",
+   "shape": "box",
+   "kind": "part",
+   "size": {
+    "x": 114.3,
+    "y": 165.1,
+    "z": 1.42
+   },
+   "mass": 0,
+   "color": "#2f7d4f",
+   "pos": {
+    "x": -152.06,
+    "y": 69.71,
+    "z": -6.14
+   },
+   "rot": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": -90.0
+   },
+   "locked": false,
+   "hidden": false,
+   "mesh": "models/venus/electrical-board.hpm",
+   "source": "Electrical Board-4"
+  },
+  {
+   "id": "cad-electrical-board-5",
+   "name": "Electrical Board 5",
+   "shape": "box",
+   "kind": "part",
+   "size": {
+    "x": 114.3,
+    "y": 165.1,
+    "z": 1.42
+   },
+   "mass": 0,
+   "color": "#2f7d4f",
+   "pos": {
+    "x": 41.81,
+    "y": 70.22,
+    "z": -58.03
+   },
+   "rot": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": -90.0
+   },
+   "locked": false,
+   "hidden": false,
+   "mesh": "models/venus/electrical-board.hpm",
+   "source": "Electrical Board-5"
+  },
+  {
+   "id": "cad-electrical-board-6",
+   "name": "Electrical Board 6",
+   "shape": "box",
+   "kind": "part",
+   "size": {
+    "x": 114.3,
+    "y": 165.1,
+    "z": 1.42
+   },
+   "mass": 0,
+   "color": "#2f7d4f",
+   "pos": {
+    "x": 41.81,
+    "y": 70.22,
+    "z": -40.73
+   },
+   "rot": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": -90.0
+   },
+   "locked": false,
+   "hidden": false,
+   "mesh": "models/venus/electrical-board.hpm",
+   "source": "Electrical Board-6"
+  },
+  {
+   "id": "cad-network-switch-1",
+   "name": "Network Switch",
+   "shape": "box",
+   "kind": "part",
+   "size": {
+    "x": 82.3,
+    "y": 46.74,
+    "z": 22.86
+   },
+   "mass": 0,
+   "color": "#7aa2f7",
+   "pos": {
+    "x": -208.56,
+    "y": -89.09,
+    "z": -47.31
+   },
+   "rot": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": -90.0
+   },
+   "locked": false,
+   "hidden": false,
+   "mesh": "models/venus/network-switch.hpm",
+   "source": "Network Switch-1"
+  },
+  {
+   "id": "cad-thor-1",
+   "name": "Thor",
+   "shape": "box",
+   "kind": "part",
+   "size": {
+    "x": 243.19,
+    "y": 112.4,
+    "z": 56.88
+   },
+   "mass": 0,
+   "color": "#4a5560",
+   "pos": {
+    "x": 108.98,
+    "y": -72.46,
+    "z": -30.3
+   },
+   "rot": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+   },
+   "locked": false,
+   "hidden": false,
+   "mesh": "models/venus/thor.hpm",
+   "source": "Thor-1"
+  },
+  {
+   "id": "cad-boat-fog-1",
+   "name": "Boat FOG",
+   "shape": "box",
+   "kind": "part",
+   "size": {
+    "x": 101.6,
+    "y": 106.68,
+    "z": 43.03
+   },
+   "mass": 0,
+   "color": "#e0af68",
+   "pos": {
+    "x": -81.75,
+    "y": -71.39,
+    "z": -37.22
+   },
+   "rot": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+   },
+   "locked": false,
+   "hidden": false,
+   "mesh": "models/venus/boat-fog.hpm",
+   "source": "Boat FOG-1"
+  }
+ ]
+}

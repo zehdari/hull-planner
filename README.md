@@ -9,6 +9,14 @@ Lay out robot internals inside a hull in 3D: move and rotate parts, resize the h
 - **Share:** Layouts → Share link packs the whole layout into the URL. Export/Import JSON and a parts CSV are there too.
 - Frame: X forward, Y port, Z up; origin at the hull centre.
 
+## CAD import
+
+The default layout is the Venus hull, converted from the SolidWorks assembly with real part meshes:
+
+    python3 tools/import_sw.py "cad/Venus Hull Assembly.SLDASM" static/models/venus --name Venus
+
+It reads SolidWorks 2015+ files directly (each part's saved display mesh, plus the component placements and hidden states from the assembly), so SolidWorks isn't needed. Parts must be saved with display data, which is the default. Masses aren't in the files, so set them in the app. The raw CAD files (`cad/`) aren't committed.
+
 No build step: `static/` is the whole app (three.js r170 vendored in `static/vendor`). `python3 -m http.server -d static` is enough to run it locally.
 
 `server.py` is an optional backend that adds named server-side saves (`/api/layouts`). The UI only shows that section when the backend is there.

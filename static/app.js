@@ -49,7 +49,9 @@ function emptyLayout() {
   return s;
 }
 
-let state = loadLocal() || starter();
+const DEFAULT_LAYOUT = 'models/venus/layout.json'; // the team's CAD layout (tools/import_sw.py)
+const local = loadLocal();
+let state = local || starter();
 let selectedId = null;
 let issues = new Map(); // id -> { hits: Set<id>, outside: bool }
 const narrow = matchMedia('(max-width: 860px)').matches;
@@ -58,7 +60,7 @@ const view = { hull: true, labels: !narrow, markers: true };
 function loadLocal() {
   try {
     const s = JSON.parse(localStorage.getItem(LS_KEY));
-    if (s && s.name === 'Starter' && s.hull?.shape === 'cylinder') return null; // pre-box starter
+    if (s && s.name === 'Starter') return null; // old placeholder layout: show the CAD layout instead
     return s && s.parts ? normalize(s) : null;
   } catch { return null; }
 }
@@ -75,6 +77,7 @@ function normalize(s) {
     pos: { x: +p.pos?.x || 0, y: +p.pos?.y || 0, z: +p.pos?.z || 0 },
     rot: { x: +p.rot?.x || 0, y: +p.rot?.y || 0, z: +p.rot?.z || 0 },
     locked: !!p.locked, hidden: !!p.hidden,
+    ...(typeof p.mesh === 'string' ? { mesh: p.mesh } : {}), ...(p.source ? { source: String(p.source) } : {}),
   }));
   return s;
 }
@@ -276,19 +279,56 @@ function partGeometry(p) {
   return new THREE.BoxGeometry(p.size.x, p.size.y, p.size.z);
 }
 
+// CAD meshes (.hpm from tools/import_sw.py): 'HPM1', nVerts, nTris, int16 xyz (0.01 mm), int8 normals, uint16/32 indices.
+// Centred on their bounding box, so a part's size/pos/rot describe the box the mesh sits in.
+const meshCache = new Map();
+function loadMesh(url) {
+  if (!meshCache.has(url)) {
+    meshCache.set(url, fetch(url).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then(buf => {
+      const dv = new DataView(buf), nV = dv.getUint32(4, true), nT = dv.getUint32(8, true);
+      const pad = n => Math.ceil(n / 4) * 4;
+      let o = 12;
+      const raw = new Int16Array(buf, o, nV * 3); o += pad(nV * 6);
+      const nrm = new Int8Array(buf, o, nV * 3); o += pad(nV * 3);
+      const idx = nV > 65535 ? new Uint32Array(buf, o, nT * 3) : new Uint16Array(buf, o, nT * 3);
+      const pos = new Float32Array(nV * 3);
+      for (let i = 0; i < pos.length; i++) pos[i] = raw[i] / 100;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3, true));
+      g.setIndex(new THREE.BufferAttribute(idx, 1));
+      g.userData.shared = true;
+      return { geo: g, edges: Object.assign(new THREE.EdgesGeometry(g, 30), { userData: { shared: true } }) };
+    }));
+  }
+  return meshCache.get(url);
+}
+const disposeGeo = g => { if (!g.userData.shared) g.dispose(); };
+
 function buildPart(p) {
   const old = meshes.get(p.id);
-  if (old) { partsGroup.remove(old); old.geometry.dispose(); }
+  if (old) { partsGroup.remove(old); disposeGeo(old.geometry); }
   const geo = partGeometry(p);
   const ko = p.kind === 'keepout';
   const mat = new THREE.MeshStandardMaterial({
-    color: p.color, roughness: 0.55, metalness: 0.05,
-    transparent: ko, opacity: ko ? 0.18 : 1, depthWrite: !ko, side: ko ? THREE.DoubleSide : THREE.FrontSide,
+    color: p.color, roughness: p.mesh ? 0.7 : 0.55, metalness: 0.05,
+    transparent: ko || !!p.mesh, opacity: ko ? 0.18 : p.mesh ? 0.25 : 1, depthWrite: !ko,
+    side: ko || p.mesh ? THREE.DoubleSide : THREE.FrontSide,
   });
   const mesh = new THREE.Mesh(geo, mat);
   const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), new THREE.LineBasicMaterial({ color: 0x0d1418, transparent: true, opacity: 0.6 }));
   mesh.add(edges);
   mesh.userData = { id: p.id, edges };
+  if (p.mesh) {
+    // show the bounding box faintly until the CAD mesh arrives
+    loadMesh(p.mesh).then(({ geo: g, edges: eg }) => {
+      if (meshes.get(p.id) !== mesh) return;
+      mesh.geometry.dispose(); mesh.geometry = g;
+      edges.geometry.dispose(); edges.geometry = eg;
+      mat.transparent = ko; mat.opacity = ko ? 0.18 : 1; mat.needsUpdate = true;
+      requestRender();
+    }).catch(() => toast(`Couldn't load the CAD mesh for ${p.name}; showing its bounding box`));
+  }
   mesh.visible = !p.hidden;
   mesh.position.set(p.pos.x, p.pos.y, p.pos.z);
   mesh.rotation.set(p.rot.x * DEG, p.rot.y * DEG, p.rot.z * DEG);
@@ -305,7 +345,7 @@ function syncMesh(p) {
 }
 
 function rebuildParts() {
-  for (const m of meshes.values()) { partsGroup.remove(m); m.geometry.dispose(); }
+  for (const m of meshes.values()) { partsGroup.remove(m); disposeGeo(m.geometry); }
   meshes.clear();
   state.parts.forEach(buildPart);
   attachGizmo();
@@ -579,7 +619,7 @@ function duplicate(id) {
 }
 function removePart(id) {
   const i = state.parts.findIndex(p => p.id === id); if (i < 0) return;
-  const m = meshes.get(id); if (m) { gizmo.detach(); partsGroup.remove(m); m.geometry.dispose(); meshes.delete(id); }
+  const m = meshes.get(id); if (m) { gizmo.detach(); partsGroup.remove(m); disposeGeo(m.geometry); meshes.delete(id); }
   state.parts.splice(i, 1);
   commit(); select(null);
 }
@@ -661,6 +701,13 @@ function renderEditor() {
       <input type="text" data-k="name" value="${esc(p.name)}" maxlength="60">
       <button class="close" data-act="deselect" aria-label="Close">×</button>
     </div>
+    ${p.mesh ? `
+    <p class="hint" style="margin:8px 0 0">CAD mesh${p.source ? ` (${esc(p.source)})` : ''}. Fit checks use its bounding box: ${fmt(p.size.x, 1)} × ${fmt(p.size.y, 1)} × ${fmt(p.size.z, 1)} mm.</p>
+    <div class="grid two" style="margin-top:6px">
+      <div><label>Type</label><select data-k="kind"><option value="part"${p.kind === 'part' ? ' selected' : ''}>Part</option><option value="keepout"${p.kind === 'keepout' ? ' selected' : ''}>Keep-out zone</option></select></div>
+      ${p.kind === 'part' ? num('mass', 'Mass kg', p.mass, 0.01) : '<div></div>'}
+    </div>
+    <div class="row"><button class="btn small ghost" data-act="unmesh">Swap for a plain box (to resize it)</button></div>` : `
     <div class="grid two" style="margin-top:8px">
       <div><label>Shape</label><select data-k="shape"><option value="box"${!cyl ? ' selected' : ''}>Box</option><option value="cylinder"${cyl ? ' selected' : ''}>Cylinder</option></select></div>
       <div><label>Type</label><select data-k="kind"><option value="part"${p.kind === 'part' ? ' selected' : ''}>Part</option><option value="keepout"${p.kind === 'keepout' ? ' selected' : ''}>Keep-out zone</option></select></div>
@@ -670,7 +717,7 @@ function renderEditor() {
       ${cyl ? num('size.x', 'Length', p.size.x) + num('size.y', 'Diameter', p.size.y) + (p.kind === 'part' ? num('mass', 'Mass kg', p.mass, 0.01) : '<div></div>')
             : num('size.x', 'X length', p.size.x) + num('size.y', 'Y width', p.size.y) + num('size.z', 'Z height', p.size.z)}
     </div>
-    ${!cyl && p.kind === 'part' ? `<div class="grid" style="margin-top:6px">${num('mass', 'Mass kg', p.mass, 0.01)}</div>` : ''}
+    ${!cyl && p.kind === 'part' ? `<div class="grid" style="margin-top:6px">${num('mass', 'Mass kg', p.mass, 0.01)}</div>` : ''}`}
     <h3>Position (mm, from hull centre)</h3>
     <div class="grid">${num('pos.x', 'X fwd', p.pos.x, snap)}${num('pos.y', 'Y port', p.pos.y, snap)}${num('pos.z', 'Z up', p.pos.z, snap)}</div>
     <h3>Rotation (°)</h3>
@@ -755,6 +802,7 @@ $('#editor').addEventListener('click', e => {
     case 'slide': slide(id, b.dataset.ax, +b.dataset.dir); break;
     case 'center': p.pos.y = 0; syncMesh(p); evaluate(); commit(); renderEditor(); break;
     case 'auto': if (autoPlace(p)) { syncMesh(p); evaluate(); commit(); renderEditor(); } else toast('No free spot big enough'); break;
+    case 'unmesh': delete p.mesh; buildPart(p); attachGizmo(); evaluate(); commit(); renderEditor(); break;
     case 'dup': duplicate(id); break;
     case 'lock': p.locked = !p.locked; attachGizmo(); commit(); renderEditor(); renderList(); break;
     case 'hide': p.hidden = !p.hidden; syncMesh(p); attachGizmo(); evaluate(); commit(); renderEditor(); renderList(); break;
@@ -854,9 +902,10 @@ function renderStats() {
   hits /= 2;
   const dz = mp.com.z;
   const parts = state.parts.filter(p => p.kind === 'part' && !p.hidden).length;
+  const unset = state.parts.filter(p => p.kind === 'part' && !p.hidden && !p.mass).length;
   const stat = (k, v, cls = '') => `<div class="stat"><span class="k">${k}</span><span class="v ${cls}">${v}</span></div>`;
   $('#stats').innerHTML =
-    stat('Mass', `${mp.mass.toFixed(2)} kg`) +
+    stat('Mass', `${mp.mass.toFixed(2)} kg${unset ? ` · ${unset} unset` : ''}`, unset ? 'warn' : '') +
     stat('Net buoyancy', `${mp.net >= 0 ? '+' : ''}${mp.net.toFixed(2)} kg`, Math.abs(mp.net) < 0.25 ? 'good' : '') +
     stat('CoM vs CoB (x y z)', `${fmt(mp.com.x)} ${fmt(mp.com.y)} ${fmt(dz)} mm`, dz < -2 ? 'good' : dz > 2 ? 'bad' : 'warn') +
     stat('Packed', `${(mp.partVol / mp.innerVol * 100).toFixed(0)}% · ${parts} parts`) +
@@ -1007,7 +1056,15 @@ $('#import-json').onchange = async e => {
   e.target.value = '';
 };
 $('#shot').onclick = () => { renderer.render(scene, camera); renderer.domElement.toBlob(b => download(fileBase() + '.png', b)); };
-$('#reset-starter').onclick = () => { if (confirm('Replace the current layout with the starter layout? (Undo still works.)')) replaceState(starter()); };
+async function fetchDefault() {
+  const r = await fetch(DEFAULT_LAYOUT);
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+$('#reset-starter').onclick = async () => {
+  if (!confirm('Replace the current layout with the Venus CAD layout? (Undo still works.)')) return;
+  try { replaceState(await fetchDefault()); } catch { toast("Couldn't load the CAD layout"); }
+};
 $('#reset-empty').onclick = () => { if (confirm('Remove every part? (Undo still works.)')) { const s = structuredClone(state); s.parts = []; replaceState(s); } };
 
 // ---------- toolbar / tabs / keys ----------
@@ -1064,6 +1121,7 @@ updateUndoButtons();
 setView('iso');
 const wanted = new URLSearchParams(location.search).get('layout');
 if (wanted) loadLayout(wanted);
-loadFromHash();
+else if (location.hash.startsWith('#l=')) loadFromHash();
+else if (!local) fetchDefault().then(s => replaceState(s, false)).catch(() => toast("Couldn't load the CAD layout; showing placeholders"));
 probeServer();
 window.__hp = { get state() { return state; }, select, setView, evaluate, issues: () => issues };
