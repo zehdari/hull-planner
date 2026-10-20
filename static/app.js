@@ -52,7 +52,9 @@ function emptyLayout() {
 const DEFAULT_LAYOUT = 'models/venus/layout.json'; // the team's CAD layout (tools/import_sw.py)
 const local = loadLocal();
 let state = local || starter();
-let selectedId = null;
+let selectedId = null;        // the part the editor shows (last one picked)
+let selection = new Set();    // every selected part id; more than one = moving a group
+let multiMode = false;        // toolbar toggle: taps add to the selection (no shift key on phones)
 let issues = new Map(); // id -> { hits: Set<id>, outside: bool }
 const narrow = matchMedia('(max-width: 860px)').matches;
 const view = { hull: true, labels: !narrow, markers: true };
@@ -99,7 +101,8 @@ function restore(snap) {
   state = normalize(JSON.parse(snap));
   lastSnap = snap;
   localStorage.setItem(LS_KEY, snap);
-  if (selectedId && !partById(selectedId)) selectedId = null;
+  for (const id of selection) if (!partById(id)) selection.delete(id);
+  if (selectedId && !partById(selectedId)) selectedId = [...selection].pop() ?? null;
   rebuildAll();
   updateUndoButtons();
 }
@@ -108,7 +111,7 @@ function redo() { if (redoStack.length) { undoStack.push(lastSnap); restore(redo
 function updateUndoButtons() { $('#undo').disabled = !undoStack.length; $('#redo').disabled = !redoStack.length; }
 function replaceState(s, keepHistory = true) {
   state = normalize(s);
-  selectedId = null;
+  selectedId = null; selection.clear();
   if (keepHistory) commit(); else { lastSnap = JSON.stringify(state); localStorage.setItem(LS_KEY, lastSnap); }
   rebuildAll();
   fitView();
@@ -143,11 +146,26 @@ gizmo.setSpace('world');
 if (matchMedia('(pointer: coarse)').matches) gizmo.setSize(1.35);
 scene.add(gizmo.getHelper());
 gizmo.addEventListener('change', requestRender);
+// A multi-part selection hangs the gizmo on this pivot at the group's centre; parts follow it rigidly.
+const pivot = new THREE.Object3D();
+let groupDrag = null; // { inv: pivot matrix at drag start, inverted; parts: [[part, matrix at start]] }
 gizmo.addEventListener('dragging-changed', e => {
   orbit.enabled = !e.value;
-  if (!e.value) { commit(); renderEditor(); }
+  if (e.value && gizmo.object === pivot) {
+    pivot.updateMatrixWorld();
+    groupDrag = { inv: pivot.matrixWorld.clone().invert(), parts: movableSel().map(p => [p, partMatrix(p)]) };
+  }
+  if (!e.value) { groupDrag = null; commit(); renderEditor(); if (gizmo.object === pivot) attachGizmo(); }
 });
 gizmo.addEventListener('objectChange', () => {
+  if (gizmo.object === pivot) {
+    if (!groupDrag) return;
+    pivot.updateMatrixWorld();
+    const delta = pivot.matrixWorld.clone().multiply(groupDrag.inv);
+    for (const [p, m0] of groupDrag.parts) { setFromMatrix(p, delta.clone().multiply(m0)); syncMesh(p); }
+    evaluate(); syncEditorTransform();
+    return;
+  }
   const p = partById(selectedId); const m = gizmo.object;
   if (!p || !m) return;
   p.pos = { x: r2(m.position.x), y: r2(m.position.y), z: r2(m.position.z) };
@@ -156,6 +174,7 @@ gizmo.addEventListener('objectChange', () => {
   syncEditorTransform();
 });
 
+scene.add(pivot);
 const hullGroup = new THREE.Group(); scene.add(hullGroup);
 const partsGroup = new THREE.Group(); scene.add(partsGroup);
 const markerGroup = new THREE.Group(); scene.add(markerGroup);
@@ -417,7 +436,7 @@ function evaluate() {
     if (collides(live[i], live[j])) { issues.get(live[i].id).hits.add(live[j].id); issues.get(live[j].id).hits.add(live[i].id); }
   }
   for (const [id, m] of meshes) {
-    const is = issues.get(id), sel = id === selectedId;
+    const is = issues.get(id), sel = selection.has(id);
     const bad = is && is.hits.size, out = is && is.outside;
     const em = m.material.emissive;
     if (bad) em.set(0x7a1010); else if (out) em.set(0x6a4200); else if (sel) em.set(0x0f3d3a); else em.set(0x000000);
@@ -486,9 +505,9 @@ function updateLabels() {
     el.style.left = ((v.x + 1) / 2 * w) + 'px'; el.style.top = ((1 - v.y) / 2 * h) + 'px';
   };
   for (const p of state.parts) {
-    if (p.hidden || (!view.labels && p.id !== selectedId)) continue;
+    if (p.hidden || (!view.labels && !selection.has(p.id))) continue;
     const is = issues.get(p.id);
-    place(p.id, p.name, new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z), (p.id === selectedId ? 'sel' : '') + (is && (is.hits.size || is.outside) ? ' bad' : ''));
+    place(p.id, p.name, new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z), (selection.has(p.id) ? 'sel' : '') + (is && (is.hits.size || is.outside) ? ' bad' : ''));
   }
   if (view.markers) {
     place('_com', 'CoM', comMarker.position, 'marker');
@@ -569,18 +588,52 @@ renderer.domElement.addEventListener('pointerup', e => {
   // keep-outs are see-through, so prefer a solid part behind one
   const solid = hits.find(h => partById(h.object.userData.id)?.kind !== 'keepout');
   const hit = solid || hits[0];
-  select(hit ? hit.object.userData.id : null);
+  const additive = e.shiftKey || e.ctrlKey || e.metaKey || multiMode;
+  if (additive && !hit) return; // a stray click shouldn't drop a selection you're building
+  select(hit ? hit.object.userData.id : null, additive);
 });
 
-function select(id) {
-  selectedId = id;
+// additive: toggle id in the selection instead of replacing it
+function select(id, additive = false) {
+  if (additive && id) {
+    if (selection.has(id)) { selection.delete(id); if (selectedId === id) selectedId = [...selection].pop() ?? null; }
+    else { selection.add(id); selectedId = id; }
+  } else {
+    selection = new Set(id ? [id] : []);
+    selectedId = id;
+  }
   attachGizmo();
   evaluate();
   renderEditor();
   renderList();
   if (id) { $$('.tabs [data-tab]')[0].click(); $('#tab-parts').scrollTop = 0; }
 }
+const selParts = () => state.parts.filter(p => selection.has(p.id));
+const movableSel = () => selParts().filter(p => !p.locked && !p.hidden);
+const isGroup = () => selection.size > 1;
+function centroid(ps) {
+  const c = new THREE.Vector3();
+  for (const p of ps) c.add(new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z));
+  return ps.length ? c.divideScalar(ps.length) : c;
+}
+const partMatrix = p => new THREE.Matrix4().compose(new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z),
+  new THREE.Quaternion().setFromEuler(new THREE.Euler(p.rot.x * DEG, p.rot.y * DEG, p.rot.z * DEG)), new THREE.Vector3(1, 1, 1));
+const cleanDeg = v => { const d = Math.round(v / DEG * 100) / 100; return Math.abs(d) < 1e-6 ? 0 : d; };
+function setFromMatrix(p, m) {
+  const pos = new THREE.Vector3(), q = new THREE.Quaternion();
+  m.decompose(pos, q, new THREE.Vector3());
+  const e = new THREE.Euler().setFromQuaternion(q);
+  p.pos = { x: r2(pos.x), y: r2(pos.y), z: r2(pos.z) };
+  p.rot = { x: cleanDeg(e.x), y: cleanDeg(e.y), z: cleanDeg(e.z) };
+}
 function attachGizmo() {
+  if (isGroup()) {
+    const ps = movableSel();
+    if (ps.length) { pivot.position.copy(centroid(ps)); pivot.rotation.set(0, 0, 0); pivot.updateMatrixWorld(); gizmo.attach(pivot); }
+    else gizmo.detach();
+    applySnap(); requestRender();
+    return;
+  }
   const p = selectedId && partById(selectedId);
   const m = p && meshes.get(p.id);
   if (m && !p.locked && !p.hidden) gizmo.attach(m); else gizmo.detach();
@@ -684,13 +737,113 @@ function rotate90(id, axis) {
   syncMesh(p); evaluate(); commit(); renderEditor();
 }
 
+// Group versions: the selection moves as one rigid body; parts inside it may touch each other.
+function groupValid(ps) {
+  const inGroup = new Set(ps);
+  return ps.every(p => (p.kind === 'keepout' || insideHull(p)) && !state.parts.some(o => !inGroup.has(o) && !o.hidden && collides(p, o)));
+}
+function afterGroupMove(ps) { ps.forEach(syncMesh); evaluate(); commit(); renderEditor(); attachGizmo(); }
+function rotateGroup(axis) {
+  const ps = movableSel(); if (!ps.length) return;
+  const c = centroid(ps);
+  const ax = new THREE.Vector3(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0);
+  const T = new THREE.Matrix4().makeTranslation(c.x, c.y, c.z)
+    .multiply(new THREE.Matrix4().makeRotationAxis(ax, Math.PI / 2))
+    .multiply(new THREE.Matrix4().makeTranslation(-c.x, -c.y, -c.z));
+  for (const p of ps) setFromMatrix(p, T.clone().multiply(partMatrix(p)));
+  afterGroupMove(ps);
+}
+function slideGroup(axis, dir) {
+  const ps = movableSel(); if (!ps.length) return;
+  if (!groupValid(ps)) return toast('The group already overlaps something or pokes out. Fix that first.');
+  const d = hullDims(), lim = { x: d.L, y: d.W, z: d.H }[axis];
+  let moved = 0;
+  for (const step of [16, 4, 1, 0.25]) {
+    while (Math.abs(moved) < lim) {
+      ps.forEach(p => { p.pos[axis] += dir * step; }); moved += dir * step;
+      if (!groupValid(ps)) { ps.forEach(p => { p.pos[axis] -= dir * step; }); moved -= dir * step; break; }
+    }
+  }
+  ps.forEach(p => { p.pos[axis] = r2(p.pos[axis]); });
+  afterGroupMove(ps);
+}
+function moveGroupTo(axis, v) {
+  const ps = movableSel(); if (!ps.length) return;
+  const dv = v - centroid(ps)[axis];
+  ps.forEach(p => { p.pos[axis] = r2(p.pos[axis] + dv); syncMesh(p); });
+  evaluate(); attachGizmo();
+}
+function duplicateGroup() {
+  const ps = selParts(); if (!ps.length) return;
+  // shift the copies sideways by the group's width so they land next to it
+  const lo = Math.min(...ps.map(p => p.pos.y - Math.max(p.size.y, p.size.z) / 2));
+  const hi = Math.max(...ps.map(p => p.pos.y + Math.max(p.size.y, p.size.z) / 2));
+  const copies = ps.map(src => {
+    const p = structuredClone(src);
+    p.id = newId(); p.name = src.name + ' copy'; p.locked = false; p.pos.y = r2(p.pos.y + (hi - lo) + 5);
+    state.parts.push(p); buildPart(p);
+    return p.id;
+  });
+  commit();
+  selection = new Set(copies); selectedId = copies[copies.length - 1];
+  attachGizmo(); evaluate(); renderEditor(); renderList();
+}
+function removeSelected() {
+  const ids = new Set(selection); if (!ids.size) return;
+  gizmo.detach();
+  for (const id of ids) { const m = meshes.get(id); if (m) { partsGroup.remove(m); disposeGeo(m.geometry); meshes.delete(id); } }
+  state.parts = state.parts.filter(p => !ids.has(p.id));
+  commit(); select(null);
+}
+
 // ---------- panel: editor ----------
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const num = (key, label, val, step = 1) =>
   `<div><label>${label}</label><input type="number" data-k="${key}" value="${r2(val)}" step="${step}" inputmode="decimal"></div>`;
 
+function renderGroupEditor(ed) {
+  const ps = selParts(), mv = movableSel(), c = centroid(mv.length ? mv : ps);
+  const mass = ps.filter(p => p.kind === 'part').reduce((a, p) => a + p.mass, 0);
+  const snap = +state.settings.snap || 1;
+  const g = (axis, label) => `<div><label>${label}</label><input type="number" data-g="${axis}" value="${r2(c[axis])}" step="${snap}" inputmode="decimal"></div>`;
+  const allLocked = ps.every(p => p.locked), allHidden = ps.every(p => p.hidden);
+  ed.innerHTML = `
+    <div class="head">
+      <strong style="flex:1">${ps.length} parts selected</strong>
+      <button class="close" data-act="deselect" aria-label="Clear selection">×</button>
+    </div>
+    <p class="hint" style="margin:4px 0 0">${ps.map(p => esc(p.name)).join(', ')} · ${mass.toFixed(2)} kg${mv.length < ps.length ? ` · ${ps.length - mv.length} locked or hidden (won't move)` : ''}</p>
+    <h3>Group centre (mm)</h3>
+    <div class="grid">${g('x', 'X fwd')}${g('y', 'Y port')}${g('z', 'Z up')}</div>
+    <h3>Rotate the group about its centre</h3>
+    <div class="row wrap">
+      <button class="btn small" data-act="r90" data-ax="x">↻ 90° X</button>
+      <button class="btn small" data-act="r90" data-ax="y">↻ 90° Y</button>
+      <button class="btn small" data-act="r90" data-ax="z">↻ 90° Z</button>
+    </div>
+    <h3>Push until it touches</h3>
+    <div class="row wrap">
+      <button class="btn small" data-act="slide" data-ax="z" data-dir="-1">↓ Down</button>
+      <button class="btn small" data-act="slide" data-ax="z" data-dir="1">↑ Up</button>
+      <button class="btn small" data-act="slide" data-ax="x" data-dir="1">→ Fwd</button>
+      <button class="btn small" data-act="slide" data-ax="x" data-dir="-1">← Aft</button>
+      <button class="btn small" data-act="slide" data-ax="y" data-dir="1">Port</button>
+      <button class="btn small" data-act="slide" data-ax="y" data-dir="-1">Stbd</button>
+      <button class="btn small" data-act="center">Centre Y</button>
+    </div>
+    <div class="row wrap" style="margin-top:10px">
+      <button class="btn small" data-act="dup">Duplicate</button>
+      <button class="btn small${allLocked ? ' on' : ''}" data-act="lock">${allLocked ? 'Locked' : 'Lock all'}</button>
+      <button class="btn small${allHidden ? ' on' : ''}" data-act="hide">${allHidden ? 'Hidden' : 'Hide all'}</button>
+      <button class="btn small danger" data-act="del">Delete ${ps.length}</button>
+    </div>
+    <div class="issues"></div>`;
+  renderEditorIssues();
+}
+
 function renderEditor() {
   const ed = $('#editor');
+  if (isGroup()) return renderGroupEditor(ed);
   const p = selectedId && partById(selectedId);
   if (!p) { ed.innerHTML = ''; return; }
   const cyl = p.shape === 'cylinder';
@@ -748,7 +901,18 @@ function renderEditor() {
   renderEditorIssues();
 }
 function renderEditorIssues() {
-  const el = $('#editor .issues'); const p = selectedId && partById(selectedId);
+  const el = $('#editor .issues');
+  if (el && isGroup()) {
+    const ps = selParts(), ids = new Set(ps.map(p => p.id));
+    const out = ps.filter(p => issues.get(p.id)?.outside).length;
+    const hits = new Set();
+    for (const p of ps) for (const h of issues.get(p.id)?.hits || []) hits.add(ids.has(h) ? 'inside the group' : partById(h)?.name);
+    el.innerHTML = (out ? `<div class="warn">⚠ ${out} part${out > 1 ? 's poke' : ' pokes'} outside the hull or clearance</div>` : '')
+      + (hits.size ? `<div class="bad">✕ Overlaps: ${[...hits].map(esc).join(', ')}</div>` : '')
+      || '<div class="good">✓ All fit, no overlaps</div>';
+    return;
+  }
+  const p = selectedId && partById(selectedId);
   if (!el || !p) return;
   const is = issues.get(p.id);
   const out = [];
@@ -758,6 +922,12 @@ function renderEditorIssues() {
   el.innerHTML = out.join('');
 }
 function syncEditorTransform() {
+  if (isGroup()) {
+    const ps = movableSel(), c = centroid(ps);
+    for (const ax of 'xyz') { const el = $(`#editor [data-g="${ax}"]`); if (el && document.activeElement !== el) el.value = r2(c[ax]); }
+    renderEditorIssues();
+    return;
+  }
   const p = selectedId && partById(selectedId); if (!p) return;
   for (const k of ['pos.x', 'pos.y', 'pos.z', 'rot.x', 'rot.y', 'rot.z']) {
     const el = $(`#editor [data-k="${k}"]`); if (el && document.activeElement !== el) el.value = r2(getPath(p, k));
@@ -768,6 +938,10 @@ const getPath = (o, k) => k.split('.').reduce((a, b) => a[b], o);
 function setPath(o, k, v) { const ks = k.split('.'); const last = ks.pop(); ks.reduce((a, b) => a[b], o)[last] = v; }
 
 $('#editor').addEventListener('input', e => {
+  if (e.target.dataset.g) {
+    const v = parseFloat(e.target.value); if (isFinite(v)) moveGroupTo(e.target.dataset.g, v);
+    return;
+  }
   const k = e.target.dataset.k; const p = partById(selectedId);
   if (!k || !p) return;
   if (e.target.type === 'number') {
@@ -783,6 +957,7 @@ $('#editor').addEventListener('input', e => {
   if (k === 'color') renderList();
 });
 $('#editor').addEventListener('change', e => {
+  if (e.target.dataset.g) return commit();
   const k = e.target.dataset.k; const p = partById(selectedId);
   if (!k || !p) return;
   if (k === 'shape' || k === 'kind') {
@@ -795,6 +970,20 @@ $('#editor').addEventListener('change', e => {
 });
 $('#editor').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
+  if (isGroup()) {
+    const ps = selParts();
+    switch (b.dataset.act) {
+      case 'deselect': select(null); break;
+      case 'r90': rotateGroup(b.dataset.ax); break;
+      case 'slide': slideGroup(b.dataset.ax, +b.dataset.dir); break;
+      case 'center': moveGroupTo('y', 0); commit(); renderEditor(); break;
+      case 'dup': duplicateGroup(); break;
+      case 'lock': { const v = !ps.every(p => p.locked); ps.forEach(p => { p.locked = v; }); attachGizmo(); commit(); renderEditor(); renderList(); break; }
+      case 'hide': { const v = !ps.every(p => p.hidden); ps.forEach(p => { p.hidden = v; syncMesh(p); }); attachGizmo(); evaluate(); commit(); renderEditor(); renderList(); break; }
+      case 'del': removeSelected(); break;
+    }
+    return;
+  }
   const id = selectedId, p = partById(id); if (!p && b.dataset.act !== 'deselect') return;
   switch (b.dataset.act) {
     case 'deselect': select(null); break;
@@ -815,7 +1004,7 @@ function renderList() {
   const ul = $('#part-list');
   const fmtSize = p => p.shape === 'cylinder' ? `⌀${fmt(p.size.y)}×${fmt(p.size.x)}` : `${fmt(p.size.x)}×${fmt(p.size.y)}×${fmt(p.size.z)}`;
   ul.innerHTML = state.parts.map(p => `
-    <li data-id="${p.id}" class="${p.id === selectedId ? 'sel' : ''}${p.hidden ? ' hid' : ''}">
+    <li data-id="${p.id}" class="${selection.has(p.id) ? 'sel' : ''}${p.hidden ? ' hid' : ''}">
       <span class="sw${p.kind === 'keepout' ? ' ko' : ''}" style="background:${esc(p.color)}"></span>
       <span class="nm">${p.locked ? '🔒 ' : ''}${esc(p.name)}<span class="flag" data-flag="${p.id}"></span></span>
       <span class="meta">${fmtSize(p)}${p.kind === 'part' ? `<br>${p.mass.toFixed(2)} kg` : '<br>keep-out'}</span>
@@ -830,7 +1019,10 @@ function updateListFlags() {
   }
 }
 $('#part-list').addEventListener('click', e => {
-  const li = e.target.closest('li[data-id]'); if (li) select(li.dataset.id === selectedId ? null : li.dataset.id);
+  const li = e.target.closest('li[data-id]'); if (!li) return;
+  const id = li.dataset.id;
+  if (e.shiftKey || e.ctrlKey || e.metaKey || multiMode) select(id, true);
+  else select(selection.size === 1 && selection.has(id) ? null : id);
 });
 
 // ---------- panel: hull ----------
@@ -1076,6 +1268,7 @@ $$('[data-toggle]').forEach(b => b.onclick = () => {
   hullGroup.visible = view.hull; markerGroup.visible = view.markers; requestRender();
 });
 $('#fit').onclick = fitView;
+$('#multi').onclick = () => { multiMode = !multiMode; $('#multi').classList.toggle('on', multiMode); toast(multiMode ? 'Multi-select on: taps add or remove parts' : 'Multi-select off'); };
 $('#undo').onclick = undo; $('#redo').onclick = redo;
 $$('[data-add]').forEach(b => b.onclick = () => addPart(b.dataset.add));
 $$('.tabs [data-tab]').forEach(b => b.onclick = () => {
@@ -1089,20 +1282,29 @@ addEventListener('keydown', e => {
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
-  if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); if (selectedId) duplicate(selectedId); return; }
+  if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); if (isGroup()) duplicateGroup(); else if (selectedId) duplicate(selectedId); return; }
+  if (mod && e.key.toLowerCase() === 'a') {
+    e.preventDefault();
+    const vis = state.parts.filter(p => !p.hidden);
+    selection = new Set(vis.map(p => p.id)); selectedId = vis.length ? vis[vis.length - 1].id : null;
+    attachGizmo(); evaluate(); renderEditor(); renderList();
+    return;
+  }
   if (mod) return;
   const p = selectedId && partById(selectedId);
   const step = +state.settings.snap || 1;
   const nudge = { ArrowUp: ['x', 1], ArrowDown: ['x', -1], ArrowLeft: ['y', 1], ArrowRight: ['y', -1], PageUp: ['z', 1], PageDown: ['z', -1] }[e.key];
-  if (nudge && p && !p.locked) {
-    e.preventDefault(); p.pos[nudge[0]] = r2(p.pos[nudge[0]] + nudge[1] * step); syncMesh(p); evaluate(); syncEditorTransform(); commit(); return;
+  if (nudge && movableSel().length) {
+    e.preventDefault();
+    for (const q of movableSel()) { q.pos[nudge[0]] = r2(q.pos[nudge[0]] + nudge[1] * step); syncMesh(q); }
+    evaluate(); syncEditorTransform(); commit(); if (isGroup()) attachGizmo(); return;
   }
   switch (e.key.toLowerCase()) {
     case 'w': setMode('translate'); break;
     case 'e': setMode('rotate'); break;
     case 'f': fitView(); break;
     case 'escape': select(null); break;
-    case 'delete': case 'backspace': if (p) removePart(p.id); break;
+    case 'delete': case 'backspace': if (isGroup()) removeSelected(); else if (p) removePart(p.id); break;
   }
 });
 
@@ -1124,4 +1326,4 @@ if (wanted) loadLayout(wanted);
 else if (location.hash.startsWith('#l=')) loadFromHash();
 else if (!local) fetchDefault().then(s => replaceState(s, false)).catch(() => toast("Couldn't load the CAD layout; showing placeholders"));
 probeServer();
-window.__hp = { get state() { return state; }, select, setView, evaluate, issues: () => issues };
+window.__hp = { get state() { return state; }, get selection() { return selection; }, select, setView, evaluate, issues: () => issues };
