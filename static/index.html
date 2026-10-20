@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#0d1418">
+<title>Hull Planner</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.js",
+  "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+</head>
+<body>
+<div id="app">
+  <section id="stage">
+    <div id="viewport"></div>
+    <div id="labels"></div>
+
+    <div class="toolbar" id="tb-top">
+      <div class="seg" role="group" aria-label="Gizmo">
+        <button data-mode="translate" class="on" title="Move (W)">Move</button>
+        <button data-mode="rotate" title="Rotate (E)">Rotate</button>
+      </div>
+      <div class="seg" role="group" aria-label="View">
+        <button data-view="iso" title="3D view">3D</button>
+        <button data-view="top" title="Top (looking down)">Top</button>
+        <button data-view="side" title="Side (from starboard)">Side</button>
+        <button data-view="front" title="Front (from bow)">Front</button>
+        <button id="fit" title="Fit hull in view (F)">Fit</button>
+      </div>
+      <div class="seg" role="group" aria-label="Edit">
+        <button id="undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+        <button id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
+      </div>
+      <div class="seg" role="group" aria-label="Show">
+        <button data-toggle="hull" class="on" title="Show hull">Hull</button>
+        <button data-toggle="labels" class="on" title="Show labels">Labels</button>
+        <button data-toggle="markers" class="on" title="Show CoM / CoB">CoM</button>
+      </div>
+    </div>
+
+    <div id="stats"></div>
+  </section>
+
+  <aside id="panel">
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="parts" class="on">Parts</button>
+      <button role="tab" data-tab="hull">Hull</button>
+      <button role="tab" data-tab="layouts">Layouts</button>
+    </nav>
+
+    <div class="tab on" id="tab-parts">
+      <div id="editor"></div>
+      <div class="row add-row">
+        <button class="btn" data-add="box">+ Box</button>
+        <button class="btn" data-add="cylinder">+ Cylinder</button>
+        <button class="btn ghost" data-add="keepout">+ Keep-out</button>
+        <button class="btn ghost" id="paste-open">Paste list</button>
+      </div>
+      <div id="paste-box" hidden>
+        <p class="hint">One part per line: <code>name, L x W x H, mass</code>. Millimetres and kilograms. Also takes CSV/TSV columns <code>name, L, W, H, mass</code>, and <code>⌀D x L</code> for a cylinder.</p>
+        <textarea id="paste-text" rows="6" placeholder="Jetson Orin, 110 x 110 x 72, 0.65&#10;Battery 4S 10Ah, 166x69x44, 0.85&#10;Sonar board, ⌀60 x 120, 0.2"></textarea>
+        <div class="row">
+          <button class="btn" id="paste-add">Add parts</button>
+          <label class="check"><input type="checkbox" id="paste-replace"> Replace current parts</label>
+        </div>
+      </div>
+      <ul id="part-list"></ul>
+    </div>
+
+    <div class="tab" id="tab-hull">
+      <div id="hull-form"></div>
+    </div>
+
+    <div class="tab" id="tab-layouts">
+      <h3 style="margin-top:4px">Share</h3>
+      <div class="row wrap">
+        <button class="btn" id="share">Share link</button>
+      </div>
+      <p class="hint" id="share-msg">The link carries the whole layout (hull and parts), so whoever opens it sees exactly this. Nothing is uploaded.</p>
+      <div id="server-box" hidden>
+        <h3>Saved on Cam-PC</h3>
+        <div class="row">
+          <input id="layout-name" type="text" placeholder="Layout name" maxlength="80">
+          <button class="btn" id="save">Save</button>
+        </div>
+        <p class="hint" id="save-msg"></p>
+        <ul id="layout-list" class="plain"></ul>
+      </div>
+      <h3>Files</h3>
+      <div class="row wrap">
+        <button class="btn ghost" id="export-json">Export JSON</button>
+        <label class="btn ghost file">Import JSON<input type="file" id="import-json" accept=".json,application/json"></label>
+        <button class="btn ghost" id="export-csv">Export parts CSV</button>
+        <button class="btn ghost" id="shot">Screenshot PNG</button>
+      </div>
+      <h3>Start over</h3>
+      <div class="row wrap">
+        <button class="btn ghost" id="reset-starter">Load starter layout</button>
+        <button class="btn ghost danger" id="reset-empty">Empty hull</button>
+      </div>
+      <p class="hint">Changes autosave in this browser. Use Share link or Export JSON to move a layout to another device or person.</p>
+      <h3>Keys</h3>
+      <p class="hint">W move · E rotate · F fit · Del delete · Ctrl+D duplicate · Ctrl+Z / Ctrl+Shift+Z undo/redo · Esc deselect · arrows nudge by the snap (PgUp/PgDn for Z).</p>
+    </div>
+  </aside>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
