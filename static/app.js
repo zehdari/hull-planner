@@ -63,7 +63,7 @@ function loadLocal() {
   try {
     const s = JSON.parse(localStorage.getItem(LS_KEY));
     if (s && s.name === 'Starter') return null; // old placeholder layout: show the CAD layout instead
-    if (s && s.name === 'Venus' && (s.rev || 1) < 2) return null; // before the vendor CAD parts went in
+    if (s && s.name === 'Venus' && (s.rev || 1) < 3) return null; // before the current vendor CAD parts went in
     return s && s.parts ? normalize(s) : null;
   } catch { return null; }
 }
@@ -81,6 +81,7 @@ function normalize(s) {
     rot: { x: +p.rot?.x || 0, y: +p.rot?.y || 0, z: +p.rot?.z || 0 },
     locked: !!p.locked, hidden: !!p.hidden,
     ...(typeof p.mesh === 'string' ? { mesh: p.mesh } : {}), ...(p.source ? { source: String(p.source) } : {}),
+    ...(Array.isArray(p.variants) && p.variants.length ? { variants: p.variants, variant: +p.variant || 0 } : {}),
   }));
   return s;
 }
@@ -863,6 +864,8 @@ function renderEditor() {
       <div><label>Type</label><select data-k="kind"><option value="part"${p.kind === 'part' ? ' selected' : ''}>Part</option><option value="keepout"${p.kind === 'keepout' ? ' selected' : ''}>Keep-out zone</option></select></div>
       ${p.kind === 'part' ? num('mass', 'Mass kg', p.mass, 0.01) : '<div></div>'}
     </div>
+    ${p.variants?.length > 1 ? `<div class="field"><label>Model</label><select data-k="variant">${p.variants.map((v, i) =>
+      `<option value="${i}"${i === p.variant ? ' selected' : ''}>${esc(v.label)} · ${fmt(v.size.x)}×${fmt(v.size.y)}×${fmt(v.size.z)}</option>`).join('')}</select></div>` : ''}
     <div class="row"><button class="btn small ghost" data-act="unmesh">Swap for a plain box (to resize it)</button></div>` : `
     <div class="grid two" style="margin-top:8px">
       <div><label>Shape</label><select data-k="shape"><option value="box"${!cyl ? ' selected' : ''}>Box</option><option value="cylinder"${cyl ? ' selected' : ''}>Cylinder</option></select></div>
@@ -963,6 +966,14 @@ $('#editor').addEventListener('change', e => {
   if (e.target.dataset.g) return commit();
   const k = e.target.dataset.k; const p = partById(selectedId);
   if (!k || !p) return;
+  if (k === 'variant') {
+    // swap the mesh, keeping the part on the same bottom (and centred where it was)
+    const v = p.variants[+e.target.value]; if (!v) return;
+    const flat = !p.rot.x && !p.rot.y;
+    if (flat) p.pos.z = r2(p.pos.z - p.size.z / 2 + v.size.z / 2);
+    p.variant = +e.target.value; p.mesh = v.mesh; p.size = { ...v.size };
+    buildPart(p); attachGizmo(); evaluate(); renderEditor(); renderList();
+  }
   if (k === 'shape' || k === 'kind') {
     p[k] = e.target.value;
     if (k === 'shape' && p.shape === 'cylinder') p.size.z = p.size.y;
@@ -994,7 +1005,7 @@ $('#editor').addEventListener('click', e => {
     case 'slide': slide(id, b.dataset.ax, +b.dataset.dir); break;
     case 'center': p.pos.y = 0; syncMesh(p); evaluate(); commit(); renderEditor(); break;
     case 'auto': if (autoPlace(p)) { syncMesh(p); evaluate(); commit(); renderEditor(); } else toast('No free spot big enough'); break;
-    case 'unmesh': delete p.mesh; buildPart(p); attachGizmo(); evaluate(); commit(); renderEditor(); break;
+    case 'unmesh': delete p.mesh; delete p.variants; delete p.variant; buildPart(p); attachGizmo(); evaluate(); commit(); renderEditor(); break;
     case 'dup': duplicate(id); break;
     case 'lock': p.locked = !p.locked; attachGizmo(); commit(); renderEditor(); renderList(); break;
     case 'hide': p.hidden = !p.hidden; syncMesh(p); attachGizmo(); evaluate(); commit(); renderEditor(); renderList(); break;

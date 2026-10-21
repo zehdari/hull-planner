@@ -26,6 +26,10 @@ from import_sw import write_hpm
 
 ROOT = Path(__file__).resolve().parent.parent
 I = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+# extra looks for a part, switchable in the editor: placeholder name -> [(label, vendor mesh)]
+VARIANTS = {
+    'Thor': [('With case', 'thor_dec.glb'), ('Case off (board, module, heatsink, fan)', 'thor_nocase.glb')],
+}
 SPEC = [
     # placeholder name      vendor mesh       new name                      rot (planner <- vendor)              anchor    mass kg
     ('Thor',                'thor_dec.glb',   'Jetson AGX Thor Dev Kit',    I,                                   'center', 0),
@@ -37,6 +41,16 @@ SPEC = [
 ]
 
 
+def prepare(src, rot):
+    m = trimesh.load(ROOT / 'vendor' / src, force='mesh')
+    M = np.array(rot, float)
+    assert abs(np.linalg.det(M) - 1) < 1e-9
+    m.apply_transform(np.block([[M, np.zeros((3, 1))], [np.zeros((1, 3)), np.ones((1, 1))]]))
+    lo, hi = m.bounds
+    m.apply_translation(-(lo + hi) / 2)
+    return m.smooth_shaded, hi - lo  # smooth_shaded splits vertices at creases so boxy parts keep sharp edges
+
+
 def main():
     out = Path(sys.argv[1])
     layout = json.loads((out / 'layout.json').read_text())
@@ -46,14 +60,7 @@ def main():
         if p is None:
             print(f'skip {old_name}: not in layout'); continue
         assert all(v == 0 for v in p['rot'].values()), f'{old_name} is rotated; anchor maths assumes it is not'
-        m = trimesh.load(ROOT / 'vendor' / src, force='mesh')
-        M = np.array(rot, float)
-        assert abs(np.linalg.det(M) - 1) < 1e-9
-        m.apply_transform(np.block([[M, np.zeros((3, 1))], [np.zeros((1, 3)), np.ones((1, 1))]]))
-        lo, hi = m.bounds
-        m.apply_translation(-(lo + hi) / 2)
-        m = m.smooth_shaded  # split vertices at creases so boxy parts keep sharp edges
-        size = hi - lo
+        m, size = prepare(src, rot)
         P, S = np.array([p['pos'][k] for k in 'xyz']), np.array([p['size'][k] for k in 'xyz'])
         pos = P.copy()
         if anchor == 'bottom': pos[2] = P[2] - S[2] / 2 + size[2] / 2
@@ -61,13 +68,22 @@ def main():
         old_mesh = p.get('mesh')
         slug = Path(src).stem.replace('_dec', '')
         write_hpm(out / f'{slug}.hpm', np.asarray(m.vertices), np.asarray(m.vertex_normals), np.asarray(m.faces))
-        p.update(name=new_name, mesh=url + f'{slug}.hpm', mass=mass, source=f'vendor CAD ({src})',
+        p.update(name=new_name, mesh=url + f'{slug}.hpm', mass=mass, source={'thor': 'NVIDIA', 'orin': 'NVIDIA via the Talos CAD', 'zedx': 'Stereolabs', 'zedxm': 'Stereolabs', 'vn100': 'VectorNav'}[Path(src).stem.replace('_dec', '')] + ' CAD',
                  size={k: round(float(v), 2) for k, v in zip('xyz', size)},
                  pos={k: round(float(v), 2) for k, v in zip('xyz', pos)})
+        variants = []
+        for label, vsrc in VARIANTS.get(old_name, []):
+            vm, vsize = (m, size) if vsrc == src else prepare(vsrc, rot)
+            vslug = Path(vsrc).stem.replace('_dec', '').replace('_', '-')
+            if vsrc != src:
+                write_hpm(out / f'{vslug}.hpm', np.asarray(vm.vertices), np.asarray(vm.vertex_normals), np.asarray(vm.faces))
+            variants.append({'label': label, 'mesh': url + f'{vslug}.hpm', 'size': {k: round(float(v), 2) for k, v in zip('xyz', vsize)}})
+        if variants:
+            p['variants'] = variants; p['variant'] = 0
         if old_mesh and not any(q.get('mesh') == old_mesh for q in layout['parts']):
             (out / Path(old_mesh).name).unlink(missing_ok=True)
         print(f'{old_name:22s} -> {new_name:26s} {len(m.faces):6d} tris, {np.round(size, 1)} mm at {np.round(pos, 1)}')
-    layout['rev'] = 2
+    layout['rev'] = 3
     (out / 'layout.json').write_text(json.dumps(layout, indent=1))
 
 

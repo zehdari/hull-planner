@@ -43,7 +43,7 @@
    "locked": false,
    "hidden": false,
    "mesh": "models/venus/zedxm.hpm",
-   "source": "vendor CAD (zedxm_dec.glb)"
+   "source": "Stereolabs CAD"
   },
   {
    "id": "cad-electrical-board-1",
@@ -97,7 +97,7 @@
    "locked": false,
    "hidden": false,
    "mesh": "models/venus/zedx.hpm",
-   "source": "vendor CAD (zedx_dec.glb)"
+   "source": "Stereolabs CAD"
   },
   {
    "id": "cad-orin-with-capture-card-1",
@@ -124,7 +124,7 @@
    "locked": false,
    "hidden": true,
    "mesh": "models/venus/orin.hpm",
-   "source": "vendor CAD (orin_dec.glb)"
+   "source": "NVIDIA via the Talos CAD CAD"
   },
   {
    "id": "cad-vectornav-vn100-1",
@@ -151,7 +151,7 @@
    "locked": false,
    "hidden": false,
    "mesh": "models/venus/vn100.hpm",
-   "source": "vendor CAD (vn100_dec.glb)"
+   "source": "VectorNav CAD"
   },
   {
    "id": "cad-electrical-board-2",
@@ -340,7 +340,28 @@
    "locked": false,
    "hidden": false,
    "mesh": "models/venus/thor.hpm",
-   "source": "vendor CAD (thor_dec.glb)"
+   "source": "NVIDIA CAD",
+   "variants": [
+    {
+     "label": "With case",
+     "mesh": "models/venus/thor.hpm",
+     "size": {
+      "x": 243.31,
+      "y": 112.4,
+      "z": 56.88
+     }
+    },
+    {
+     "label": "Case off (board, module, heatsink, fan)",
+     "mesh": "models/venus/thor-nocase.hpm",
+     "size": {
+      "x": 242.18,
+      "y": 112.4,
+      "z": 54.77
+     }
+    }
+   ],
+   "variant": 0
   },
   {
    "id": "cad-boat-fog-1",
@@ -370,5 +391,5 @@
    "source": "Boat FOG-1"
   }
  ],
- "rev": 2
+ "rev": 3
 }
