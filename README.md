@@ -17,6 +17,12 @@ The default layout is the Venus hull, converted from the SolidWorks assembly wit
 
 It reads SolidWorks 2015+ files directly (each part's saved display mesh, plus the component placements and hidden states from the assembly), so SolidWorks isn't needed. Parts must be saved with display data, which is the default. Masses aren't in the files, so set them in the app. The raw CAD files (`cad/`) aren't committed.
 
+Then the off-the-shelf parts are swapped for manufacturer CAD (ZED X, ZED X Mini, VN-100 Rugged, Jetson AGX Thor and AGX Orin dev kits), placed where the team's placeholders were:
+
+    ~/tools/cadvenv/bin/python tools/replace_parts.py static/models/venus
+
+Sources and orientation choices are listed at the top of `tools/replace_parts.py`. The simplified vendor meshes it reads (`vendor/`) aren't committed. `tools/sw_flatten.py` flattens a SolidWorks assembly with embedded components (an imported STEP) into one mesh; that's how the Orin came out of the team's Talos CAD.
+
 No build step: `static/` is the whole app (three.js r170 vendored in `static/vendor`). `python3 -m http.server -d static` is enough to run it locally.
 
 `server.py` is an optional backend that adds named server-side saves (`/api/layouts`). The UI only shows that section when the backend is there.

@@ -2,3 +2,4 @@ layouts/
 __pycache__/
 *.tmp
 cad/
+vendor/

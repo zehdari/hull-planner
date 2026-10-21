@@ -191,6 +191,7 @@ def main():
             meshes[base] = {'url': url + f'{slug}.hpm', 'c': c, 'size': Pl.max(0) - Pl.min(0)}
             print(f'  mesh {base}: {len(P)} verts, {len(T)} tris, {np.round(Pl.max(0) - Pl.min(0), 1)} mm')
         mm = meshes[base]
+        R = R.T  # SolidWorks stores component rotations transposed (row-vector form)
         Q = SW2P @ R @ SW2P.T
         pos = Q @ mm['c'] + SW2P @ (t - hull_ctr)
         name = NICE.get(base, base)

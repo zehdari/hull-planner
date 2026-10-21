@@ -20,20 +20,20 @@
  "parts": [
   {
    "id": "cad-dfc-1",
-   "name": "DFC",
+   "name": "DFC \u00b7 ZED X Mini",
    "shape": "box",
    "kind": "part",
    "size": {
-    "x": 36.83,
-    "y": 93.73,
-    "z": 32.0
+    "x": 31.82,
+    "y": 93.43,
+    "z": 47.42
    },
-   "mass": 0,
+   "mass": 0.15,
    "color": "#2ac3de",
    "pos": {
     "x": 164.86,
     "y": 58.25,
-    "z": -42.74
+    "z": -35.03
    },
    "rot": {
     "x": 0.0,
@@ -42,8 +42,8 @@
    },
    "locked": false,
    "hidden": false,
-   "mesh": "models/venus/dfc.hpm",
-   "source": "DFC-1"
+   "mesh": "models/venus/zedxm.hpm",
+   "source": "vendor CAD (zedxm_dec.glb)"
   },
   {
    "id": "cad-electrical-board-1",
@@ -65,7 +65,7 @@
    "rot": {
     "x": 0.0,
     "y": 0.0,
-    "z": -90.0
+    "z": 90.0
    },
    "locked": false,
    "hidden": false,
@@ -74,18 +74,18 @@
   },
   {
    "id": "cad-ffc-full-zed-1",
-   "name": "FFC (ZED)",
+   "name": "FFC \u00b7 ZED X",
    "shape": "box",
    "kind": "part",
    "size": {
-    "x": 36.83,
-    "y": 163.58,
-    "z": 32.0
+    "x": 47.41,
+    "y": 163.43,
+    "z": 31.82
    },
-   "mass": 0,
+   "mass": 0.24,
    "color": "#73daca",
    "pos": {
-    "x": 231.36,
+    "x": 226.07,
     "y": 1.08,
     "z": 24.23
    },
@@ -96,25 +96,25 @@
    },
    "locked": false,
    "hidden": false,
-   "mesh": "models/venus/ffc-full-zed.hpm",
-   "source": "FFC Full zed-1"
+   "mesh": "models/venus/zedx.hpm",
+   "source": "vendor CAD (zedx_dec.glb)"
   },
   {
    "id": "cad-orin-with-capture-card-1",
-   "name": "Orin + capture card",
+   "name": "Jetson AGX Orin Dev Kit",
    "shape": "box",
    "kind": "part",
    "size": {
-    "x": 105.99,
-    "y": 105.99,
-    "z": 73.79
+    "x": 106.35,
+    "y": 109.59,
+    "z": 58.63
    },
    "mass": 0,
    "color": "#5d7a3a",
    "pos": {
     "x": -164.53,
     "y": -61.84,
-    "z": -21.84
+    "z": -29.42
    },
    "rot": {
     "x": 0.0,
@@ -123,20 +123,20 @@
    },
    "locked": false,
    "hidden": true,
-   "mesh": "models/venus/orin-with-capture-card.hpm",
-   "source": "Orin with capture card-1"
+   "mesh": "models/venus/orin.hpm",
+   "source": "vendor CAD (orin_dec.glb)"
   },
   {
    "id": "cad-vectornav-vn100-1",
-   "name": "VectorNav VN-100",
+   "name": "VectorNav VN-100 Rugged",
    "shape": "box",
    "kind": "part",
    "size": {
-    "x": 33.02,
-    "y": 35.81,
-    "z": 8.89
+    "x": 33.11,
+    "y": 35.92,
+    "z": 8.92
    },
-   "mass": 0,
+   "mass": 0.015,
    "color": "#bb9af7",
    "pos": {
     "x": -158.61,
@@ -150,8 +150,8 @@
    },
    "locked": false,
    "hidden": false,
-   "mesh": "models/venus/vectornav-vn100.hpm",
-   "source": "Vectornav VN100-1"
+   "mesh": "models/venus/vn100.hpm",
+   "source": "vendor CAD (vn100_dec.glb)"
   },
   {
    "id": "cad-electrical-board-2",
@@ -173,7 +173,7 @@
    "rot": {
     "x": 0.0,
     "y": 0.0,
-    "z": -90.0
+    "z": 90.0
    },
    "locked": false,
    "hidden": false,
@@ -200,7 +200,7 @@
    "rot": {
     "x": 0.0,
     "y": 0.0,
-    "z": -90.0
+    "z": 90.0
    },
    "locked": false,
    "hidden": false,
@@ -227,7 +227,7 @@
    "rot": {
     "x": 0.0,
     "y": 0.0,
-    "z": -90.0
+    "z": 90.0
    },
    "locked": false,
    "hidden": false,
@@ -254,7 +254,7 @@
    "rot": {
     "x": 0.0,
     "y": 0.0,
-    "z": -90.0
+    "z": 90.0
    },
    "locked": false,
    "hidden": false,
@@ -281,7 +281,7 @@
    "rot": {
     "x": 0.0,
     "y": 0.0,
-    "z": -90.0
+    "z": 90.0
    },
    "locked": false,
    "hidden": false,
@@ -308,7 +308,7 @@
    "rot": {
     "x": 0.0,
     "y": 0.0,
-    "z": -90.0
+    "z": 90.0
    },
    "locked": false,
    "hidden": false,
@@ -317,11 +317,11 @@
   },
   {
    "id": "cad-thor-1",
-   "name": "Thor",
+   "name": "Jetson AGX Thor Dev Kit",
    "shape": "box",
    "kind": "part",
    "size": {
-    "x": 243.19,
+    "x": 243.31,
     "y": 112.4,
     "z": 56.88
    },
@@ -340,7 +340,7 @@
    "locked": false,
    "hidden": false,
    "mesh": "models/venus/thor.hpm",
-   "source": "Thor-1"
+   "source": "vendor CAD (thor_dec.glb)"
   },
   {
    "id": "cad-boat-fog-1",
@@ -369,5 +369,6 @@
    "mesh": "models/venus/boat-fog.hpm",
    "source": "Boat FOG-1"
   }
- ]
+ ],
+ "rev": 2
 }

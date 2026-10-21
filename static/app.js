@@ -63,6 +63,7 @@ function loadLocal() {
   try {
     const s = JSON.parse(localStorage.getItem(LS_KEY));
     if (s && s.name === 'Starter') return null; // old placeholder layout: show the CAD layout instead
+    if (s && s.name === 'Venus' && (s.rev || 1) < 2) return null; // before the vendor CAD parts went in
     return s && s.parts ? normalize(s) : null;
   } catch { return null; }
 }
@@ -338,8 +339,9 @@ function buildPart(p) {
   const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), new THREE.LineBasicMaterial({ color: 0x0d1418, transparent: true, opacity: 0.6 }));
   mesh.add(edges);
   mesh.userData = { id: p.id, edges };
-  if (p.mesh) {
-    // show the bounding box faintly until the CAD mesh arrives
+  mesh.userData.pendingMesh = !!p.mesh && p.hidden;
+  if (p.mesh && !p.hidden) {
+    // show the bounding box faintly until the CAD mesh arrives (hidden parts wait until shown)
     loadMesh(p.mesh).then(({ geo: g, edges: eg }) => {
       if (meshes.get(p.id) !== mesh) return;
       mesh.geometry.dispose(); mesh.geometry = g;
@@ -357,7 +359,8 @@ function buildPart(p) {
 }
 
 function syncMesh(p) {
-  const m = meshes.get(p.id); if (!m) return;
+  let m = meshes.get(p.id); if (!m) return;
+  if (!p.hidden && m.userData.pendingMesh) m = buildPart(p);
   m.position.set(p.pos.x, p.pos.y, p.pos.z);
   m.rotation.set(p.rot.x * DEG, p.rot.y * DEG, p.rot.z * DEG);
   m.visible = !p.hidden;
